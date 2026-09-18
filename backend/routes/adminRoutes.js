@@ -24,13 +24,13 @@ router.get('/storage-stats', async (req, res) => {
 router.delete('/files/:fileId', async (req, res) => {
   const file = await File.findByIdAndDelete(req.params.fileId);
   if (!file) return res.status(404).json({ message: 'File not found' });
-  await logAction(req.user.userId, 'admin_delete', req.params.fileId);
+  await logAction(req.user.userId, 'admin_delete', req.params.fileId, file.originalName);
 
   res.json({ message: 'File removed by admin', fileId: req.params.fileId });
 });
 
 router.get('/logs', async (req, res) => {
-  const logs = await ActivityLog.find().populate('user', 'email').populate('fileId', 'originalName').sort({ createdAt: -1 }).limit(100);
+  const logs = await ActivityLog.find().populate('user', 'email').sort({ createdAt: -1 }).limit(100);
   res.json({ logs });
 });
 
