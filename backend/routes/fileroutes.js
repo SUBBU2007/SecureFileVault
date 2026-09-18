@@ -40,7 +40,7 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       hash, s3Key, iv, authTag,
     });
 
-    await logAction(req.user.userId, 'upload', fileDoc._id);
+    await logAction(req.user.userId, 'upload', fileDoc._id, fileDoc.originalName);
     res.status(201).json({
       message: existing ? 'Duplicate detected — storage reused' : 'File uploaded and encrypted',
       file: fileDoc,
@@ -63,7 +63,7 @@ router.get('/download/:fileId', verifyToken, async (req, res) => {
     const encryptedData = await getFromS3(file.s3Key);
     const decrypted = decryptBuffer(encryptedData, file.iv, file.authTag);
 
-    await logAction(req.user.userId, 'download', file._id);
+    await logAction(req.user.userId, 'download', file._id, file.originalName);
 
     res.set('Content-Type', file.mimeType);
     res.set('Content-Disposition', `attachment; filename="${file.originalName}"`);
@@ -81,6 +81,21 @@ router.get('/my-files', verifyToken, async (req, res) => {
     res.json({ files });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch files', error: err.message });
+  }
+});
+
+router.delete('/:fileId', verifyToken, async (req, res) => {
+  try {
+    const file = await File.findById(req.params.fileId);
+    if (!file) return res.status(404).json({ message: 'File not found' });
+    if (file.owner.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    await File.findByIdAndDelete(req.params.fileId);
+    await logAction(req.user.userId, 'delete', req.params.fileId, file.originalName);
+    res.json({ message: 'File deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Delete failed', error: err.message });
   }
 });
 
